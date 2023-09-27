@@ -32,6 +32,7 @@ from alphafold.common import residue_constants
 from alphafold.data import pipeline
 from alphafold.data import pipeline_multimer
 from alphafold.data import templates
+from alphafold.data.pipeline import FeatureDict
 from alphafold.data.tools import hhsearch
 from alphafold.data.tools import hmmsearch
 from alphafold.model import config
@@ -170,19 +171,14 @@ def _jnp_to_np(output: Dict[str, Any]) -> Dict[str, Any]:
       output[k] = np.array(v)
   return output
 
-
-def predict_structure(
+def compute_features(
     fasta_path: str,
     fasta_name: str,
     output_dir_base: str,
-    data_pipeline: Union[pipeline.DataPipeline, pipeline_multimer.DataPipeline],
-    model_runners: Dict[str, model.RunModel],
-    amber_relaxer: relax.AmberRelaxation,
-    benchmark: bool,
-    random_seed: int,
-    models_to_relax: ModelsToRelax):
-  """Predicts structure using AlphaFold for the given sequence."""
-  logging.info('Predicting %s', fasta_name)
+    data_pipeline: Union[pipeline.DataPipeline, pipeline_multimer.DataPipeline]
+) -> FeatureDict:
+  """Compute MSAs for the given sequence"""
+  logging.info('Computing msas for %s', fasta_name)
   timings = {}
   output_dir = os.path.join(output_dir_base, fasta_name)
   if not os.path.exists(output_dir):
@@ -190,18 +186,42 @@ def predict_structure(
   msa_output_dir = os.path.join(output_dir, 'msas')
   if not os.path.exists(msa_output_dir):
     os.makedirs(msa_output_dir)
-
   # Get features.
   t_0 = time.time()
   feature_dict = data_pipeline.process(
-      input_fasta_path=fasta_path,
-      msa_output_dir=msa_output_dir)
+    input_fasta_path=fasta_path,
+    msa_output_dir=msa_output_dir)
   timings['features'] = time.time() - t_0
 
   # Write out features as a pickled dictionary.
   features_output_path = os.path.join(output_dir, 'features.pkl')
   with open(features_output_path, 'wb') as f:
     pickle.dump(feature_dict, f, protocol=4)
+
+  timings_output_path = os.path.join(output_dir, 'timings.json')
+  with open(timings_output_path, 'w') as f:
+    f.write(json.dumps(timings, indent=4))
+  return feature_dict
+
+def predict_structure(
+    feature_dict: FeatureDict,
+    fasta_name: str,
+    output_dir_base: str,
+    model_runners: Dict[str, model.RunModel],
+    amber_relaxer: relax.AmberRelaxation,
+    benchmark: bool,
+    random_seed: int,
+    models_to_relax: ModelsToRelax):
+  """Predicts structure using AlphaFold for the given sequence."""
+  logging.info('Predicting %s', fasta_name)
+  output_dir = os.path.join(output_dir_base, fasta_name)
+  timings_output_path = os.path.join(output_dir, 'timings.json')
+  if os.path.exists(timings_output_path):
+    with open(timings_output_path, 'rb') as fp:
+      timings = json.load(fp)
+      logging.info('Loaded previous timings from %s: %s', timings_output_path, timings)
+  else:
+    timings = {}
 
   unrelaxed_pdbs = {}
   unrelaxed_proteins = {}
@@ -440,11 +460,16 @@ def main(argv):
   # Predict structure for each of the sequences.
   for i, fasta_path in enumerate(FLAGS.fasta_paths):
     fasta_name = fasta_names[i]
-    predict_structure(
+    feature_dict = compute_features(
         fasta_path=fasta_path,
         fasta_name=fasta_name,
         output_dir_base=FLAGS.output_dir,
-        data_pipeline=data_pipeline,
+        data_pipeline=data_pipeline
+    )
+    predict_structure(
+        feature_dict=feature_dict,
+        fasta_name=fasta_name,
+        output_dir_base=FLAGS.output_dir,
         model_runners=model_runners,
         amber_relaxer=amber_relaxer,
         benchmark=FLAGS.benchmark,

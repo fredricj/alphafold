@@ -129,6 +129,9 @@ flags.DEFINE_boolean('use_gpu_relax', None, 'Whether to relax on GPU. '
                      'Relax on GPU can be much faster than CPU, so it is '
                      'recommended to enable if possible. GPUs must be available'
                      ' if this setting is enabled.')
+flags.DEFINE_boolean('compute_features_only', False, 'Whether to run only the '
+                     'multiple sequence alignments and template searches and not '
+                     'the structure prediction.')
 
 FLAGS = flags.FLAGS
 
@@ -431,6 +434,8 @@ def main(argv):
         output_dir_base=FLAGS.output_dir,
         data_pipeline=data_pipeline
     )
+    if FLAGS.compute_features_only:
+      continue
     predict_structure(
         feature_dict=feature_dict,
         fasta_name=fasta_name,

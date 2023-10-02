@@ -530,36 +530,6 @@ def main(argv):
     num_predictions_per_model = 1
     data_pipeline = monomer_data_pipeline
 
-  model_runners = {}
-  model_names = config.MODEL_PRESETS[FLAGS.model_preset]
-  for model_name in model_names:
-    model_config = config.model_config(model_name)
-    if run_multimer_system:
-      model_config.model.num_ensemble_eval = num_ensemble
-    else:
-      model_config.data.eval.num_ensemble = num_ensemble
-    model_params = data.get_model_haiku_params(
-        model_name=model_name, data_dir=FLAGS.data_dir)
-    model_runner = model.RunModel(model_config, model_params)
-    for i in range(num_predictions_per_model):
-      model_runners[f'{model_name}_pred_{i}'] = model_runner
-
-  logging.info('Have %d models: %s', len(model_runners),
-               list(model_runners.keys()))
-
-  amber_relaxer = relax.AmberRelaxation(
-      max_iterations=RELAX_MAX_ITERATIONS,
-      tolerance=RELAX_ENERGY_TOLERANCE,
-      stiffness=RELAX_STIFFNESS,
-      exclude_residues=RELAX_EXCLUDE_RESIDUES,
-      max_outer_iterations=RELAX_MAX_OUTER_ITERATIONS,
-      use_gpu=FLAGS.use_gpu_relax)
-
-  random_seed = FLAGS.random_seed
-  if random_seed is None:
-    random_seed = random.randrange(sys.maxsize // len(model_runners))
-  logging.info('Using random seed %d for the data pipeline', random_seed)
-
   # Predict structure for each of the sequences.
   for i, fasta_path in enumerate(FLAGS.fasta_paths):
     fasta_name = fasta_names[i]
@@ -578,6 +548,36 @@ def main(argv):
       )
     if FLAGS.compute_features_only:
       continue
+
+    model_runners = {}
+    model_names = config.MODEL_PRESETS[FLAGS.model_preset]
+    for model_name in model_names:
+      model_config = config.model_config(model_name)
+      if run_multimer_system:
+        model_config.model.num_ensemble_eval = num_ensemble
+      else:
+        model_config.data.eval.num_ensemble = num_ensemble
+      model_params = data.get_model_haiku_params(
+        model_name=model_name, data_dir=FLAGS.data_dir)
+      model_runner = model.RunModel(model_config, model_params)
+      for i in range(num_predictions_per_model):
+        model_runners[f'{model_name}_pred_{i}'] = model_runner
+
+    logging.info('Have %d models: %s', len(model_runners),
+                 list(model_runners.keys()))
+
+    amber_relaxer = relax.AmberRelaxation(
+      max_iterations=RELAX_MAX_ITERATIONS,
+      tolerance=RELAX_ENERGY_TOLERANCE,
+      stiffness=RELAX_STIFFNESS,
+      exclude_residues=RELAX_EXCLUDE_RESIDUES,
+      max_outer_iterations=RELAX_MAX_OUTER_ITERATIONS,
+      use_gpu=FLAGS.use_gpu_relax)
+
+    random_seed = FLAGS.random_seed
+    if random_seed is None:
+      random_seed = random.randrange(sys.maxsize // len(model_runners))
+    logging.info('Using random seed %d for the data pipeline', random_seed)
     predict_structure(
         feature_dict=feature_dict,
         fasta_name=fasta_name,

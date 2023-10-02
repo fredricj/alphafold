@@ -564,7 +564,7 @@ def main(argv):
   for i, fasta_path in enumerate(FLAGS.fasta_paths):
     fasta_name = fasta_names[i]
     feature_file = os.path.join(FLAGS.output_dir, fasta_name, 'features.pkl')
-    if FLAGS.use_precomputed_msa and os.path.exists(feature_file):
+    if FLAGS.use_precomputed_msas and os.path.exists(feature_file):
       with open(feature_file, 'rb') as f:
         feature_dict = pickle.load(f)
     else:

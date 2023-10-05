@@ -15,6 +15,7 @@
 """Full AlphaFold protein structure prediction script."""
 import enum
 import json
+import lzma
 import os
 import pathlib
 import pickle
@@ -198,8 +199,8 @@ def compute_features(
   timings['features'] = time.time() - t_0
 
   # Write out features as a pickled dictionary.
-  features_output_path = os.path.join(output_dir, 'features.pkl')
-  with open(features_output_path, 'wb') as f:
+  features_output_path = os.path.join(output_dir, 'features.pkl.xz')
+  with lzma.open(features_output_path, 'wb') as f:
     pickle.dump(feature_dict, f, protocol=4)
 
   timings_output_path = os.path.join(output_dir, 'timings.json')
@@ -240,9 +241,9 @@ def _save_mmcif_file(
   mmcif_string = protein.to_mmcif(prot, file_id, model_type)
 
   # Save the MMCIF.
-  mmcif_output_path = os.path.join(output_dir, f'{model_name}.cif')
-  with open(mmcif_output_path, 'w') as f:
-    f.write(mmcif_string)
+  mmcif_output_path = os.path.join(output_dir, f'{model_name}.cif.xz')
+  with lzma.open(mmcif_output_path, 'wb') as f:
+    f.write(mmcif_string.encode())
 
 
 def _save_pae_json_file(
@@ -338,8 +339,8 @@ def predict_structure(
     np_prediction_result = _jnp_to_np(dict(prediction_result))
 
     # Save the model outputs.
-    result_output_path = os.path.join(output_dir, f'result_{model_name}.pkl')
-    with open(result_output_path, 'wb') as f:
+    result_output_path = os.path.join(output_dir, f'result_{model_name}.pkl.xz')
+    with lzma.open(result_output_path, 'wb') as f:
       pickle.dump(np_prediction_result, f, protocol=4)
 
     # Add the predicted LDDT in the b-factor column.
@@ -354,9 +355,9 @@ def predict_structure(
 
     unrelaxed_proteins[model_name] = unrelaxed_protein
     unrelaxed_pdbs[model_name] = protein.to_pdb(unrelaxed_protein)
-    unrelaxed_pdb_path = os.path.join(output_dir, f'unrelaxed_{model_name}.pdb')
-    with open(unrelaxed_pdb_path, 'w') as f:
-      f.write(unrelaxed_pdbs[model_name])
+    unrelaxed_pdb_path = os.path.join(output_dir, f'unrelaxed_{model_name}.pdb.xz')
+    with lzma.open(unrelaxed_pdb_path, 'wb') as f:
+      f.write(unrelaxed_pdbs[model_name].encode())
 
     _save_mmcif_file(
         prot=unrelaxed_protein,
@@ -393,9 +394,9 @@ def predict_structure(
 
     # Save the relaxed PDB.
     relaxed_output_path = os.path.join(
-        output_dir, f'relaxed_{model_name}.pdb')
-    with open(relaxed_output_path, 'w') as f:
-      f.write(relaxed_pdb_str)
+        output_dir, f'relaxed_{model_name}.pdb.xz')
+    with lzma.open(relaxed_output_path, 'wb') as f:
+      f.write(relaxed_pdb_str.encode())
 
     relaxed_protein = protein.from_pdb_string(relaxed_pdb_str)
     _save_mmcif_file(
@@ -408,12 +409,12 @@ def predict_structure(
 
   # Write out relaxed PDBs in rank order.
   for idx, model_name in enumerate(ranked_order):
-    ranked_output_path = os.path.join(output_dir, f'ranked_{idx}.pdb')
-    with open(ranked_output_path, 'w') as f:
+    ranked_output_path = os.path.join(output_dir, f'ranked_{idx}.pdb.xz')
+    with lzma.open(ranked_output_path, 'wb') as f:
       if model_name in relaxed_pdbs:
-        f.write(relaxed_pdbs[model_name])
+        f.write(relaxed_pdbs[model_name].encode())
       else:
-        f.write(unrelaxed_pdbs[model_name])
+        f.write(unrelaxed_pdbs[model_name].encode())
 
     if model_name in relaxed_pdbs:
       protein_instance = protein.from_pdb_string(relaxed_pdbs[model_name])
@@ -533,11 +534,11 @@ def main(argv):
   # Predict structure for each of the sequences.
   for i, fasta_path in enumerate(FLAGS.fasta_paths):
     fasta_name = fasta_names[i]
-    feature_file = os.path.join(FLAGS.output_dir, fasta_name, 'features.pkl')
+    feature_file = os.path.join(FLAGS.output_dir, fasta_name, 'features.pkl.xz')
     if FLAGS.use_precomputed_msas and os.path.exists(feature_file):
       if FLAGS.compute_features_only:
         continue
-      with open(feature_file, 'rb') as f:
+      with lzma.open(feature_file, 'rb') as f:
         feature_dict = pickle.load(f)
     else:
       feature_dict = compute_features(

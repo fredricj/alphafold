@@ -579,6 +579,9 @@ def main(argv):
     if random_seed is None:
       random_seed = random.randrange(sys.maxsize // len(model_runners))
     logging.info('Using random seed %d for the data pipeline', random_seed)
+    seed_file = os.path.join(FLAGS.output_dir, fasta_name, 'random_seed.txt')
+    with open(seed_file, 'w') as f:
+      f.write(str(random_seed))
     predict_structure(
         feature_dict=feature_dict,
         fasta_name=fasta_name,

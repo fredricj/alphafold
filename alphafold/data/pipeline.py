@@ -137,7 +137,8 @@ class DataPipeline:
     else:
       self.hhblits_bfd_uniref_runner = hhblits.HHBlits(
           binary_path=hhblits_binary_path,
-          databases=[bfd_database_path, uniref30_database_path])
+          databases=[bfd_database_path, uniref30_database_path],
+          n_cpu=8)
     self.jackhmmer_mgnify_runner = jackhmmer.Jackhmmer(
         binary_path=jackhmmer_binary_path,
         database_path=mgnify_database_path)
